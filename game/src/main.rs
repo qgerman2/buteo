@@ -3,10 +3,17 @@ use bevy::prelude::*;
 use bevy_async_task::*;
 use comms::CommsSystem;
 use futures::prelude::*;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::UnwrapThrowExt;
 use ws_stream_wasm::*;
 
 mod comms;
+
+#[derive(Debug, Serialize, Deserialize)]
+enum CustomMessage {
+    Hola { x: String, y: String },
+    Chao(i32, i32),
+}
 
 fn main() {
     App::new()
@@ -33,12 +40,22 @@ fn my_system(mut task_executor: AsyncTaskRunner<u32>) {
     task_executor.start(async {
         let (_ws, mut wsio) = WsMeta::connect("ws://127.0.0.1:3212", None).await.unwrap();
         info!("holy shi");
-        wsio.send(WsMessage::Text("HIIIIIII".into())).await.unwrap();
-        info!("sent hi");
+        let mimensage = CustomMessage::Chao(10, 13);
+        let msg = serde_json::to_string(&mimensage).unwrap();
+        wsio.send(WsMessage::Text(msg)).await.unwrap();
+        info!("sent msg");
         let msg = wsio.next().await;
         info!("got result");
         let result = msg.expect_throw("Stream closed");
-        info!("{:?}", result);
+        if let WsMessage::Text(tex) = result {
+            if let Ok(respuesta) = serde_json::from_str::<CustomMessage>(&tex) {
+                info!("got json {:?}", respuesta);
+            } else {
+                info!("error al leer json");
+            }
+        } else {
+            info!("message received is not text");
+        }
         return 5;
     })
 }

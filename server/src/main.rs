@@ -1,8 +1,15 @@
 use async_tungstenite::tokio::TokioAdapter;
 use async_tungstenite::{accept_async, tungstenite::Message};
 use futures::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr, str::FromStr};
 use tokio::net::{TcpListener, TcpStream};
+
+#[derive(Debug, Serialize, Deserialize)]
+enum CustomMessage {
+    Hola { x: String, y: String },
+    Chao(i32, i32),
+}
 
 #[tokio::main]
 async fn main() {
@@ -30,6 +37,18 @@ async fn connection(stream: Result<(TcpStream, SocketAddr), io::Error>) {
             println!("conexion desconectada por remoto");
             return;
         }
+        if let Message::Text(tex) = msg {
+            if let Ok(jj) = serde_json::from_str::<CustomMessage>(&tex.to_string()) {
+                println!("got json {:?}", jj);
+            } else {
+                println!("error decodificando el json");
+            }
+        }
+        let mimensaje = CustomMessage::Hola {
+            x: "miau".into(),
+            y: "miu".into(),
+        };
+        let msg = Message::Text(serde_json::to_string(&mimensaje).unwrap());
         if let Err(e) = stream.send(msg).await {
             println!("error {:}", e);
             return;
